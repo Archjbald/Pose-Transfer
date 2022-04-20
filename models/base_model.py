@@ -1,6 +1,7 @@
 import os
 import torch
 import torch.nn as nn
+from collections import OrderedDict
 
 
 class BaseModel(nn.Module):
@@ -55,7 +56,8 @@ class BaseModel(nn.Module):
     def load_network(self, network, network_label, epoch_label):
         save_filename = '%s_net_%s.pth' % (epoch_label, network_label)
         save_path = os.path.join(self.save_dir, save_filename)
-        network.load_state_dict(torch.load(save_path))
+        checkpoint = OrderedDict([(k, v) for k, v in torch.load(save_path).items() if ".running_" not in k])
+        network.load_state_dict(checkpoint)
 
     # update learning rate (called once every epoch)
     def update_learning_rate(self):

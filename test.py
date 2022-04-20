@@ -8,7 +8,7 @@ from util import html
 import time
 
 opt = TestOptions().parse()
-opt.nThreads = 1   # test code only supports nThreads = 1
+opt.nThreads = min(opt.nThreads, 1)  # test code only supports nThreads = 1
 opt.batchSize = 1  # test code only supports batchSize = 1
 opt.serial_batches = True  # no shuffle
 opt.no_flip = True  # no flip
@@ -31,14 +31,14 @@ print(model.training)
 opt.how_many = 999999
 # test
 for i, data in enumerate(dataset):
-    print(' process %d/%d img ..'%(i,opt.how_many))
+    print(' process %d/%d img ..' % (i, opt.how_many))
     if i >= opt.how_many:
         break
     model.set_input(data)
     startTime = time.time()
     model.test()
     endTime = time.time()
-    print(endTime-startTime)
+    print(endTime - startTime)
     visuals = model.get_current_visuals()
     img_path = model.get_image_paths()
     img_path = [img_path]
@@ -46,7 +46,3 @@ for i, data in enumerate(dataset):
     visualizer.save_images(webpage, visuals, img_path)
 
 webpage.save()
-
-
-
-

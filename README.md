@@ -39,8 +39,8 @@ In pytorch 1.0, **running_mean** and **running_var** are not saved for the **Ins
 This is Pytorch implementation for pose transfer on both Market1501 and DeepFashion dataset. The code is written by [Tengteng Huang](https://github.com/tengteng95) and [Zhen Zhu](https://github.com/jessemelpolio).
 
 ## Requirement
-* pytorch(0.3.1)
-* torchvision(0.2.0)
+* pytorch 1.0.1
+* torchvision
 * numpy
 * scipy
 * scikit-image
@@ -48,7 +48,6 @@ This is Pytorch implementation for pose transfer on both Market1501 and DeepFash
 * pandas
 * tqdm
 * dominate
-
 
 ## Getting Started
 ### Installation
@@ -60,7 +59,8 @@ cd Pose-Transfer
 ```
 
 ### Data Preperation
-We provide our **dataset split files** and **extracted keypoints files** for convience.
+
+We use [OpenPose](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) to generate keypoints, and provide our **dataset split files** and **extracted keypoints files** for convience.
 
 #### Market1501
 - Download the Market-1501 dataset from [here](http://www.liangzheng.com.cn/Project/project_reid.html). Rename **bounding_box_train** and **bounding_box_test** to **train** and **test**, and put them under the ```market_data``` directory.
@@ -177,7 +177,6 @@ python compute_ssd_score_fashion.py --input_dir path/to/generated/images
 ```
 
 #### 3) PCKh
-
 - First, run ``tool/crop_market.py`` or ``tool/crop_fashion.py``.
 - Download pose estimator from [Google Drive](https://drive.google.com/open?id=1YMsYXc41dR3k8YroXeWGh9zweNUQmZBw) or [Baidu Disk](https://pan.baidu.com/s/1fcMwXTUk9XKPLpaJSodTrg). Put it under the root folder ``Pose-Transfer``.
 - Change the paths **input_folder**  and **output_path** in ``tool/compute_coordinates.py``. And then launch
@@ -190,6 +189,9 @@ python2 compute_coordinates.py
 
 ### Pre-trained model 
 Our pre-trained model can be downloaded [Google Drive](https://drive.google.com/open?id=1YMsYXc41dR3k8YroXeWGh9zweNUQmZBw) or [Baidu Disk](https://pan.baidu.com/s/1fcMwXTUk9XKPLpaJSodTrg).
+
+### Notes:
+In pytorch 1.0, **running_mean** and **running_var** are not saved for the **Instance Normalization layer** by default. To reproduce our result in the paper, launch ``python tool/rm_insnorm_running_vars.py`` to remove corresponding keys in the pretrained model. (Only for the DeepFashion dataset.)
 
 
 ## Citation
