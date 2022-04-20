@@ -6,6 +6,7 @@ import inspect, re
 import numpy as np
 import os
 import collections
+import subprocess as sp
 
 from skimage.draw import disk, line_aa, polygon, polygon2mask, rectangle
 
@@ -148,3 +149,10 @@ def mkdirs(paths):
 def mkdir(path):
     if not os.path.exists(path):
         os.makedirs(path)
+
+
+def get_gpu_memory():
+    command = "nvidia-smi --query-gpu=memory.free --format=csv"
+    memory_free_info = sp.check_output(command.split()).decode('ascii').split('\n')[:-1][1:]
+    memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
+    return memory_free_values

@@ -3,6 +3,7 @@ from options.train_options import TrainOptions
 from data.data_loader import CreateDataLoader
 from models.models import create_model
 from util.visualizer import Visualizer
+from util.util import get_gpu_memory
 
 opt = TrainOptions().parse()
 data_loader = CreateDataLoader(opt)
@@ -25,6 +26,8 @@ for epoch in range(opt.epoch_count, opt.niter + opt.niter_decay + 1):
         epoch_iter += opt.batchSize
         model.set_input(data)
         model.optimize_parameters()
+
+        print(get_gpu_memory())
 
         if total_steps % opt.display_freq == 0:
             save_result = total_steps % opt.update_html_freq == 0
