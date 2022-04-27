@@ -154,8 +154,8 @@ class TransferModelCycle(BaseModel):
         self.real_BP1 = self.netHPE(self.input_P1)
         self.real_BP2 = self.netHPE(self.input_P2)
         self.loss_HPE = 0
-        self.loss_HPE += self.criterion_HPE(self.fake_BP1, self.real_BP1) * self.opt.lambda_HPE
-        self.loss_HPE += self.criterion_HPE(self.fake_BP2, self.real_BP2) * self.opt.lambda_HPE
+        self.loss_HPE += self.criterionHPE(self.fake_BP1, self.real_BP1) * self.opt.lambda_HPE
+        self.loss_HPE += self.criterionHPE(self.fake_BP2, self.real_BP2) * self.opt.lambda_HPE
 
         # Cycle loss
         if self.opt.L1_type == 'l1_plus_perL1':
