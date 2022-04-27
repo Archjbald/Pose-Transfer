@@ -248,7 +248,7 @@ class TransferModelCycle(BaseModel):
                 self.optimizer_D_PB.step()
 
     def get_current_errors(self):
-        ret_errors = OrderedDict([('pair_L1loss', self.pair_L1loss)])
+        ret_errors = OrderedDict()
         if self.opt.with_D_PP:
             ret_errors['D_PP'] = self.loss_D_PP
         if self.opt.with_D_PB:
@@ -258,6 +258,7 @@ class TransferModelCycle(BaseModel):
 
         ret_errors['cycle'] = self.loss_cycle.item()
         ret_errors['idt'] = self.loss_idt.item()
+        ret_errors['HPE'] = self.loss_HPE.item()
 
         return ret_errors
 
