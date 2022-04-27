@@ -7,6 +7,7 @@ import util.util as util
 from util.image_pool import ImagePool
 from .base_model import BaseModel
 from . import networks
+from .hpe.simple_bl import get_pose_net
 # losses
 from losses.L1_plus_perceptualLoss import L1_plus_perceptualLoss
 
@@ -17,9 +18,9 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 
 
-class TransferModel(BaseModel):
+class TransferModelCycle(BaseModel):
     def name(self):
-        return 'TransferModel'
+        return 'TransferModelCycle'
 
     def initialize(self, opt):
         BaseModel.initialize(self, opt)
@@ -62,7 +63,11 @@ class TransferModel(BaseModel):
             self.old_lr = opt.lr
             self.fake_PP_pool = ImagePool(opt.pool_size)
             self.fake_PB_pool = ImagePool(opt.pool_size)
+
+            self.netHPE = get_pose_net(gen_final=False)
+
             # define loss functions
+            self.criterionHPE = torch.nn.MSELoss()
             self.criterionGAN = networks.GANLoss(use_lsgan=not opt.no_lsgan, tensor=self.Tensor)
 
             if opt.L1_type == 'origin':
@@ -110,9 +115,19 @@ class TransferModel(BaseModel):
             self.input_BP2 = self.input_BP2.cuda()
 
     def forward(self):
-        G_input = [self.input_P1,
-                   torch.cat((self.input_BP1, self.input_BP2), 1)]
-        self.fake_P2 = self.netG(G_input)
+        G_input_1 = [self.input_P1,
+                     torch.cat((self.input_BP1, self.input_BP2), 1)]
+        self.fake_P2 = self.netG(G_input_1)
+        self.fake_BP2 = self.netHPE(self.fake_P2)
+        self.rec_P1 = self.netG([self.fake_P2, torch.cat((self.input_BP2, self.input_BP1), 1)])
+        self.idt_P1 = self.netG([self.input_P1, torch.cat((self.input_BP1, self.input_BP1), 1)])
+
+        G_input_2 = [self.input_P2,
+                     torch.cat((self.input_BP2, self.input_BP1), 1)]
+        self.fake_P1 = self.netG(G_input_2)
+        self.fake_BP1 = self.netHPE(self.fake_P1)
+        self.rec_P2 = self.netG([self.fake_P1, torch.cat((self.input_BP1, self.input_BP2), 1)])
+        self.idt_P2 = self.netG([self.input_P2, torch.cat((self.input_BP2, self.input_BP2), 1)])
 
     def test(self):
         with torch.no_grad():
@@ -126,23 +141,40 @@ class TransferModel(BaseModel):
 
     def backward_G(self):
         if self.opt.with_D_PB:
-            pred_fake_PB = self.netD_PB(torch.cat((self.fake_P2, self.input_BP2), 1))
-            self.loss_G_GAN_PB = self.criterionGAN(pred_fake_PB, True)
+            pred_fake_PB_2 = self.netD_PB(torch.cat((self.fake_P2, self.input_BP2), 1))
+            pred_fake_PB_1 = self.netD_PB(torch.cat((self.fake_P1, self.input_BP1), 1))
+            self.loss_G_GAN_PB = self.criterionGAN(pred_fake_PB_2, True) + self.criterionGAN(pred_fake_PB_1, True)
 
         if self.opt.with_D_PP:
-            pred_fake_PP = self.netD_PP(torch.cat((self.fake_P2, self.input_P1), 1))
-            self.loss_G_GAN_PP = self.criterionGAN(pred_fake_PP, True)
+            pred_fake_PP_2 = self.netD_PP(torch.cat((self.fake_P2, self.input_P1), 1))
+            pred_fake_PP_1 = self.netD_PP(torch.cat((self.fake_P1, self.input_P2), 1))
+            self.loss_G_GAN_PP = self.criterionGAN(pred_fake_PP_2, True) + self.criterionGAN(pred_fake_PP_1, True)
 
-        # L1 loss
+        # HPE_loss
+        self.real_BP1 = self.netHPE(self.input_P1)
+        self.real_BP2 = self.netHPE(self.input_P2)
+        self.loss_HPE = 0
+        self.loss_HPE += self.criterion_HPE(self.fake_BP1, self.real_BP1) * self.opt.lambda_HPE
+        self.loss_HPE += self.criterion_HPE(self.fake_BP2, self.real_BP2) * self.opt.lambda_HPE
+
+        # Cycle loss
         if self.opt.L1_type == 'l1_plus_perL1':
-            losses = self.criterionL1(self.fake_P2, self.input_P2)
-            self.loss_G_L1 = losses[0]
-            self.loss_originL1 = losses[1].item()
-            self.loss_perceptual = losses[2].item()
+            losses = self.criterionL1(self.rec_P2, self.input_P2) + self.criterionL1(self.rec_P1, self.input_P1)
+            self.loss_cycle = losses[0]
         else:
-            self.loss_G_L1 = self.criterionL1(self.fake_P2, self.input_P2) * self.opt.lambda_A
+            self.loss_cycle = (self.criterionL1(self.rec_P2, self.input_P2) +
+                               self.criterionL1(self.rec_P1, self.input_P1))
+        self.loss_cycle *= self.opt.lambda_cycle
 
-        pair_L1loss = self.loss_G_L1
+        # Identity loss
+        if self.opt.L1_type == 'l1_plus_perL1':
+            losses = self.criterionL1(self.idt_P2, self.input_P2) + self.criterionL1(self.idt_P1, self.input_P1)
+            self.loss_idt = losses[0]
+        else:
+            self.loss_idt = (self.criterionL1(self.idt_P2, self.input_P2) +
+                             self.criterionL1(self.idt_P1, self.input_P1))
+        self.loss_idt *= self.opt.lambda_idt
+
         if self.opt.with_D_PB:
             pair_GANloss = self.loss_G_GAN_PB * self.opt.lambda_GAN
             if self.opt.with_D_PP:
@@ -151,15 +183,16 @@ class TransferModel(BaseModel):
         else:
             if self.opt.with_D_PP:
                 pair_GANloss = self.loss_G_GAN_PP * self.opt.lambda_GAN
+            else:
+                pair_GANloss = 0.
 
+        loss_G = self.loss_idt + self.loss_cycle + self.loss_HPE
         if self.opt.with_D_PB or self.opt.with_D_PP:
-            pair_loss = pair_L1loss + pair_GANloss
-        else:
-            pair_loss = pair_L1loss
+            loss_G += pair_GANloss
 
-        pair_loss.backward()
+        loss_G.backward()
 
-        self.pair_L1loss = pair_L1loss.item()
+        self.loss_G = loss_G.item()
         if self.opt.with_D_PB or self.opt.with_D_PP:
             self.pair_GANloss = pair_GANloss.item()
 
@@ -223,9 +256,8 @@ class TransferModel(BaseModel):
         if self.opt.with_D_PB or self.opt.with_D_PP:
             ret_errors['pair_GANloss'] = self.pair_GANloss
 
-        if self.opt.L1_type == 'l1_plus_perL1':
-            ret_errors['origin_L1'] = self.loss_originL1
-            ret_errors['perceptual'] = self.loss_perceptual
+        ret_errors['cycle'] = self.loss_cycle.item()
+        ret_errors['idt'] = self.loss_idt.item()
 
         return ret_errors
 

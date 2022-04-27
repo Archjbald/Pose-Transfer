@@ -7,7 +7,10 @@ def create_model(opt):
         assert opt.dataset_mode == 'keypoint'
         from .PATN import TransferModel
         model = TransferModel()
-
+    elif opt.model == 'PATNCycle':
+        assert opt.dataset_mode == 'keypoint'
+        from .PATNCycle import TransferModelCycle
+        model = TransferModelCycle()
     else:
         raise ValueError("Model [%s] not recognized." % opt.model)
     model.initialize(opt)
